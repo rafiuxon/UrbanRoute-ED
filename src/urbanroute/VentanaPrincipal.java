@@ -175,9 +175,9 @@ public class VentanaPrincipal extends JFrame {
         botonEliminarEst.addActionListener(e -> eliminarEstacion());
         botonEliminarCon.addActionListener(e -> eliminarConexion());
         botonVer.addActionListener(e -> funcionPendiente("Ver grafo"));
-        botonSubredes.addActionListener(e -> funcionPendiente("Subredes aisladas"));
-        botonRuta.addActionListener(e -> funcionPendiente("Ruta más rápida"));
-        botonHubs.addActionListener(e -> funcionPendiente("Hubs"));
+        botonSubredes.addActionListener(e -> mostrarSubredes());
+        botonRuta.addActionListener(e -> calcularRuta());
+        botonHubs.addActionListener(e -> mostrarHubs());
 
         botones.add(crearTituloGrupo("Archivos"));
         botones.add(botonCargar);
@@ -757,9 +757,28 @@ public class VentanaPrincipal extends JFrame {
                 "Confirmar", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
 
         if (confirmar == JOptionPane.YES_OPTION) {
+            int subredesAntes = analizador.contarSubredes();
             grafo.eliminarEstacion(elegida.getId());
             hayCambiosSinGuardar = true;
             mostrarRed();
+            avisarSiSeDividio(subredesAntes, "Al cerrar la estación " + elegida.getId());
+        }
+    }
+
+    /**
+     * Despues de cerrar una estacion o una conexion, avisa si la red quedo
+     * dividida en mas subredes que antes (zonas que quedaron incomunicadas).
+     *
+     * @param subredesAntes cuantas subredes habia antes del cambio
+     * @param accion        texto que describe el cambio (ej. "Al cerrar la estación PZA_VZLA")
+     */
+    private void avisarSiSeDividio(int subredesAntes, String accion) {
+        int subredesAhora = analizador.contarSubredes();
+        if (subredesAhora > subredesAntes) {
+            JOptionPane.showMessageDialog(this,
+                    accion + ", la red pasó de " + subredesAntes + " a " + subredesAhora + " subredes.\n"
+                    + "Algunas zonas quedaron incomunicadas. Use \"Subredes aisladas\" para ver cuáles.",
+                    "La red se dividió", JOptionPane.WARNING_MESSAGE);
         }
     }
 
@@ -821,10 +840,12 @@ public class VentanaPrincipal extends JFrame {
                 "Confirmar", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
 
         if (confirmar == JOptionPane.YES_OPTION) {
+            int subredesAntes = analizador.contarSubredes();
             grafo.desconectar(origen.getId(), idDestino);
             hayCambiosSinGuardar = true;
             mostrarRed();
             seleccionarEnTabla(origen.getId());
+            avisarSiSeDividio(subredesAntes, "Al quitar la conexión " + origen.getId() + " <-> " + idDestino);
         }
     }
 
@@ -842,6 +863,139 @@ public class VentanaPrincipal extends JFrame {
             combo.addItem(vecina.getId() + " - " + vecina.getNombre() + " (" + actual.getTiempo() + " min)");
             actual = actual.getSiguiente();
         }
+    }
+
+    // ===================================================================
+    // Analisis: subredes, ruta mas rapida y hubs
+    // ===================================================================
+
+    /**
+     * Muestra las subredes aisladas de la red (calculadas con DFS).
+     */
+    private void mostrarSubredes() {
+        if (grafo.estaVacio()) {
+            mostrarError("No hay estaciones cargadas.");
+            return;
+        }
+
+        Estacion[][] subredes = analizador.obtenerSubredes();
+        String texto;
+        if (subredes.length == 1) {
+            texto = "La red está completamente conectada: desde cualquier estación se puede llegar a todas las demás.\n\n";
+        } else {
+            texto = "La red tiene " + subredes.length + " subredes aisladas. "
+                    + "Entre estaciones de subredes distintas no hay ninguna ruta.\n\n";
+        }
+
+        for (int i = 0; i < subredes.length; i++) {
+            Estacion[] subred = subredes[i];
+            texto += "Subred " + (i + 1) + " (" + subred.length + " estación(es)):\n   ";
+            for (int j = 0; j < subred.length; j++) {
+                texto += subred[j].getId();
+                if (j < subred.length - 1) {
+                    texto += ", ";
+                }
+            }
+            texto += "\n\n";
+        }
+
+        mostrarTextoLargo(texto, "Subredes aisladas", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    /**
+     * Pide dos estaciones y muestra la ruta de menor tiempo entre ellas (Dijkstra),
+     * con el tiempo de cada tramo y el total. Avisa si no existe ninguna ruta.
+     */
+    private void calcularRuta() {
+        Estacion[] existentes = grafo.obtenerEstaciones();
+        if (existentes.length < 2) {
+            mostrarError("Se necesitan al menos dos estaciones para calcular una ruta.");
+            return;
+        }
+
+        JComboBox<String> comboOrigen = new JComboBox<>(textosEstaciones(existentes));
+        JComboBox<String> comboDestino = new JComboBox<>(textosEstaciones(existentes));
+        comboDestino.setSelectedIndex(1);
+
+        JPanel formulario = new JPanel(new GridLayout(2, 2, 5, 5));
+        formulario.add(new JLabel("Estación de salida:"));
+        formulario.add(comboOrigen);
+        formulario.add(new JLabel("Estación de llegada:"));
+        formulario.add(comboDestino);
+
+        // Se repite hasta que elija dos estaciones distintas o cancele
+        while (true) {
+            int respuesta = JOptionPane.showConfirmDialog(this, formulario, "Ruta más rápida",
+                    JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+            if (respuesta != JOptionPane.OK_OPTION) {
+                return;
+            }
+
+            Estacion origen = existentes[comboOrigen.getSelectedIndex()];
+            Estacion destino = existentes[comboDestino.getSelectedIndex()];
+            if (origen == destino) {
+                mostrarError("La estación de salida y la de llegada deben ser distintas.");
+                continue;
+            }
+
+            Estacion[] ruta = analizador.calcularRutaMasCorta(origen.getId(), destino.getId());
+            if (ruta == null) {
+                JOptionPane.showMessageDialog(this,
+                        "No existe ninguna ruta entre " + origen.getId() + " (" + origen.getNombre() + ") y "
+                        + destino.getId() + " (" + destino.getNombre() + ").\n"
+                        + "Están en subredes distintas: la red no las conecta.",
+                        "Sin ruta", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            String texto = "Ruta más rápida de " + origen.getNombre() + " a " + destino.getNombre() + ":\n\n";
+            for (int i = 0; i < ruta.length; i++) {
+                texto += (i + 1) + ". " + ruta[i].getId() + " - " + ruta[i].getNombre()
+                        + " (" + ruta[i].getLinea() + ")";
+                if (i > 0) {
+                    // Tiempo del tramo desde la estacion anterior
+                    Conexion tramo = ruta[i - 1].buscarConexion(ruta[i].getId());
+                    texto += "   +" + tramo.getTiempo() + " min";
+                }
+                texto += "\n";
+            }
+            texto += "\nTiempo total: " + analizador.getTiempoUltimaRuta() + " minutos"
+                    + "  (" + (ruta.length - 1) + " tramos)";
+
+            mostrarTextoLargo(texto, "Ruta más rápida", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+    }
+
+    /**
+     * Muestra los hubs de transferencia (estaciones con mas conexiones directas)
+     * y un ranking de las estaciones con mayor grado.
+     */
+    private void mostrarHubs() {
+        Estacion[] hubs = analizador.identificarHubs();
+        if (hubs.length == 0) {
+            mostrarError("La red no tiene conexiones, así que no hay hubs.");
+            return;
+        }
+
+        String texto = "Hubs de transferencia (grado " + hubs[0].getGrado() + "):\n";
+        for (int i = 0; i < hubs.length; i++) {
+            texto += "   " + hubs[i].getId() + " - " + hubs[i].getNombre() + " (" + hubs[i].getLinea() + ")\n";
+        }
+        texto += "\nSi una de estas estaciones colapsa, se afecta a la mayor cantidad de conexiones.\n";
+
+        Estacion[] ranking = analizador.obtenerRankingPorGrado();
+        int mostrar = 10;
+        if (ranking.length < mostrar) {
+            mostrar = ranking.length;
+        }
+        texto += "\nLas " + mostrar + " estaciones con más conexiones:\n";
+        for (int i = 0; i < mostrar; i++) {
+            texto += "   " + (i + 1) + ". " + ranking[i].getId() + " - " + ranking[i].getNombre()
+                    + ": " + ranking[i].getGrado() + " conexión(es)\n";
+        }
+
+        mostrarTextoLargo(texto, "Hubs", JOptionPane.INFORMATION_MESSAGE);
     }
 
     // ===================================================================
@@ -1017,7 +1171,8 @@ public class VentanaPrincipal extends JFrame {
 
         String texto = "Archivos: " + archivos
                 + "     |     Estaciones: " + grafo.getNumEstaciones()
-                + "     |     Conexiones: " + grafo.getNumConexiones();
+                + "     |     Conexiones: " + grafo.getNumConexiones()
+                + "     |     Subredes: " + analizador.contarSubredes(); // se recalcula en cada cambio
         if (hayCambiosSinGuardar) {
             texto += "     |     Hay cambios sin guardar";
         }
