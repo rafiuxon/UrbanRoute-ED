@@ -15,6 +15,9 @@ package urbanroute;
  */
 public class AnalizadorRed {
 
+    /** Valor que representa "todavia no se conoce un camino" en Dijkstra. */
+    private static final int INFINITO = Integer.MAX_VALUE;
+
     /** Red sobre la que se hacen los calculos. */
     private Grafo grafo;
 
@@ -175,6 +178,15 @@ public class AnalizadorRed {
     /**
      * Calcula la ruta de menor tiempo entre dos estaciones con el algoritmo de Dijkstra.
      * Despues de llamarlo, el tiempo total se consulta con {@link #getTiempoUltimaRuta()}.
+     * <p>
+     * Idea: se lleva para cada estacion el menor tiempo conocido desde el origen
+     * (al inicio, infinito para todas menos el origen, que tiene 0). En cada paso
+     * se elige la estacion no visitada con menor tiempo, se marca como definitiva
+     * y se revisa si pasando por ella se llega mas rapido a sus vecinas.
+     * Para reconstruir la ruta, cada estacion recuerda desde cual se llego a ella.
+     * <p>
+     * Se usan arreglos paralelos: la posicion i de cada arreglo corresponde a la
+     * estacion i de la lista ordenada por ID. Eficiencia: O(V^2 + E log V).
      *
      * @param idOrigen  ID de la estacion de salida
      * @param idDestino ID de la estacion de llegada
@@ -182,9 +194,103 @@ public class AnalizadorRed {
      *         o null si alguna estacion no existe o no hay ninguna ruta posible
      */
     public Estacion[] calcularRutaMasCorta(String idOrigen, String idDestino) {
-        // PENDIENTE: Dijkstra
         tiempoUltimaRuta = 0;
-        return null;
+
+        Estacion origen = grafo.buscarEstacion(idOrigen);
+        Estacion destino = grafo.buscarEstacion(idDestino);
+        if (origen == null || destino == null) {
+            return null;
+        }
+
+        Estacion[] estaciones = grafo.obtenerEstaciones();
+        int n = estaciones.length;
+
+        int[] tiempo = new int[n];          // menor tiempo conocido desde el origen
+        int[] anterior = new int[n];        // desde que estacion se llego (-1 si ninguna)
+        boolean[] visitada = new boolean[n]; // true si su tiempo ya es definitivo
+
+        for (int i = 0; i < n; i++) {
+            tiempo[i] = INFINITO;
+            anterior[i] = -1;
+            visitada[i] = false;
+        }
+
+        int posOrigen = buscarPosicion(estaciones, origen.getId());
+        int posDestino = buscarPosicion(estaciones, destino.getId());
+        tiempo[posOrigen] = 0;
+
+        for (int paso = 0; paso < n; paso++) {
+            // 1) Elegir la estacion no visitada con menor tiempo
+            int actual = -1;
+            for (int i = 0; i < n; i++) {
+                if (!visitada[i] && tiempo[i] != INFINITO && (actual == -1 || tiempo[i] < tiempo[actual])) {
+                    actual = i;
+                }
+            }
+
+            // Si no queda ninguna alcanzable, o ya llegamos al destino, se termina
+            if (actual == -1 || actual == posDestino) {
+                break;
+            }
+            visitada[actual] = true;
+
+            // 2) Revisar si pasando por "actual" se llega mas rapido a cada vecina
+            Conexion conexion = estaciones[actual].getPrimeraConexion();
+            while (conexion != null) {
+                int vecina = buscarPosicion(estaciones, conexion.getDestino().getId());
+                int tiempoNuevo = tiempo[actual] + conexion.getTiempo();
+                if (!visitada[vecina] && tiempoNuevo < tiempo[vecina]) {
+                    tiempo[vecina] = tiempoNuevo;
+                    anterior[vecina] = actual;
+                }
+                conexion = conexion.getSiguiente();
+            }
+        }
+
+        if (tiempo[posDestino] == INFINITO) {
+            return null; // no existe ninguna ruta: estan en subredes distintas
+        }
+
+        // 3) Reconstruir la ruta yendo hacia atras desde el destino
+        int cantidad = 0;
+        for (int pos = posDestino; pos != -1; pos = anterior[pos]) {
+            cantidad++;
+        }
+
+        Estacion[] ruta = new Estacion[cantidad];
+        int indice = cantidad - 1;
+        for (int pos = posDestino; pos != -1; pos = anterior[pos]) {
+            ruta[indice] = estaciones[pos];
+            indice--;
+        }
+
+        tiempoUltimaRuta = tiempo[posDestino];
+        return ruta;
+    }
+
+    /**
+     * Busca la posicion de una estacion en el arreglo ordenado por ID,
+     * usando busqueda binaria (O(log V)).
+     *
+     * @param estaciones arreglo ordenado por ID
+     * @param id         ID buscado
+     * @return la posicion, o -1 si no esta
+     */
+    private int buscarPosicion(Estacion[] estaciones, String id) {
+        int inicio = 0;
+        int fin = estaciones.length - 1;
+        while (inicio <= fin) {
+            int medio = (inicio + fin) / 2;
+            int comparacion = estaciones[medio].getId().compareTo(id);
+            if (comparacion == 0) {
+                return medio;
+            } else if (comparacion < 0) {
+                inicio = medio + 1;
+            } else {
+                fin = medio - 1;
+            }
+        }
+        return -1;
     }
 
     /**
