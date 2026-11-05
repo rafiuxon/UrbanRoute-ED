@@ -1,0 +1,45 @@
+ID_Estacion,Nombre,Linea,Zona,Capacidad_Pasajeros_Hora
+PRO,Propatria,Linea 1,Catia,12000
+PER,Perez Bonalde,Linea 1,Catia,8000
+PZA,Plaza Sucre,Linea 1,Catia,9000
+GAT,Gato Negro,Linea 1,Sucre,11000
+AGU,Agua Salud,Linea 1,Sucre,10000
+CAÑ,Caño Amarillo,Linea 1,23 de Enero,7000
+SIL,Silencio,Linea 1,El Silencio,15000
+CAP,Capitolio,Linea 1,Centro,25000
+LAO,La Hoyada,Linea 1,Centro,22000
+PAR,Parque Carabobo,Linea 1,La Candelaria,14000
+BEL,Bellas Artes,Linea 1,Bellas Artes,16000
+COL,Colegio de Ingenieros,Linea 1,Quebrada Honda,10000
+PZA_VZLA,Plaza Venezuela,Linea 1,Sabana Grande,35000
+SAB,Sabana Grande,Linea 1,Sabana Grande,18000
+CHA,Chacaíto,Linea 1,Chacao,20000
+CHA_CAO,Chacao,Linea 1,Chacao,15000
+ALT,Altamira,Linea 1,Chacao,17000
+MIR,Miranda,Linea 1,Sucre,19000
+DOS_C,Dos Caminos,Linea 1,Sucre,16000
+LOS_C,Los Cortijos,Linea 1,Sucre,12000
+LOS_D,Los Dos Caminos,Linea 1,Sucre,14000
+PET,Petare,Linea 1,Petare,30000
+PAL,Palo Verde,Linea 1,Petare,22000
+ZOO,Zoológico,Linea 2,Caricuao,9000
+CAR,Caricuao,Linea 2,Caricuao,8000
+MAM,Mamera,Linea 2,Mamera,10000
+ANT,Antímano,Linea 2,Antímano,13000
+YAR,Yaguara,Linea 2,El Algodonal,7000
+LA_P,La Paz,Linea 2,El Paraíso,11000
+ART,Artigas,Linea 2,San Martín,9000
+MAT,Maternidad,Linea 2,San Martín,10000
+CAP_L2,Capitolio (L2),Linea 2,Centro,20000
+CSB,Centro Simón Bolívar,Linea 2,Centro,18000
+RIN,La Rinconada,Linea 3,C anya,25000
+MDC,Mercado,Linea 3,Coche,12000
+COC,Coche,Linea 3,Coche,14000
+VAL,El Valle,Linea 3,El Valle,20000
+BAN,Los Bandera,Linea 3,El Valle,10000
+SYM,Simón Rodríguez,Linea 3,El Recreo,11000
+CUD,Ciudad Universitaria,Linea 3,Los Chaguaramos,18000
+ZUM,Zona Rental,Linea 4,Sabana Grande,30000
+PAR_C,Parque Central,Linea 4,Bellas Artes,15000
+TEAT,Teatros,Linea 4,Centro,12000
+CAP_L4,Capuchinos,Linea 4,San Martín,16000

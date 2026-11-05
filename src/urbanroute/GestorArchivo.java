@@ -11,114 +11,183 @@ import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Se encarga de todo lo relacionado con el archivo CSV de la red:
- * leerlo para construir el grafo y guardar en el los cambios hechos en memoria.
- * <p>
- * Formato de cada linea: {@code Estacion_Origen,Estacion_Destino,Tiempo_Minutos}.
- * La primera linea puede ser un encabezado; si lo es, se ignora.
+ * Se encarga de todo lo relacionado con los archivos CSV de la red.
+ * La red se guarda en <b>dos archivos</b>:
+ * <ul>
+ *   <li>Archivo de estaciones: {@code ID_Estacion,Nombre,Linea,Zona,Capacidad_Pasajeros_Hora}.
+ *       Define los nodos del grafo y lo que se guarda en la tabla hash.</li>
+ *   <li>Archivo de conexiones: {@code Estacion_Origen,Estacion_Destino,Tiempo_Minutos}.
+ *       Define las aristas del grafo.</li>
+ * </ul>
+ * Primero se lee el de estaciones y despues el de conexiones, porque una
+ * conexion solo puede unir estaciones que ya existen.
+ * La primera linea de cada archivo puede ser un encabezado; si lo es, se ignora.
  *
  * @author Gabriel Gonzalez, Francisco Landaeta, Rafael Blanco
  */
 public class GestorArchivo {
 
-    /** Ruta del archivo maestro que se carga al iniciar el programa. */
-    public static final String RUTA_ARCHIVO_MAESTRO = "datos" + File.separator + "metro_caracas.csv";
+    /** Ruta del archivo maestro de estaciones que se carga al iniciar el programa. */
+    public static final String RUTA_ESTACIONES_MAESTRO = "datos" + File.separator + "estaciones.csv";
 
-    /** Encabezado que se escribe al guardar. */
-    private static final String ENCABEZADO = "Estacion_Origen,Estacion_Destino,Tiempo_Minutos";
+    /** Ruta del archivo maestro de conexiones que se carga al iniciar el programa. */
+    public static final String RUTA_CONEXIONES_MAESTRO = "datos" + File.separator + "conexiones.csv";
+
+    /** Encabezado que se escribe al guardar el archivo de estaciones. */
+    private static final String ENCABEZADO_ESTACIONES = "ID_Estacion,Nombre,Linea,Zona,Capacidad_Pasajeros_Hora";
+
+    /** Encabezado que se escribe al guardar el archivo de conexiones. */
+    private static final String ENCABEZADO_CONEXIONES = "Estacion_Origen,Estacion_Destino,Tiempo_Minutos";
 
     /** Maximo de errores que se describen (para no mostrar mensajes enormes). */
     private static final int MAX_ERRORES_MOSTRADOS = 15;
 
-    /** Archivo que se esta usando actualmente (null si no se ha cargado ninguno). */
-    private File archivoActual;
+    /** Archivo de estaciones en uso (null si no se ha cargado ninguno). */
+    private File archivoEstaciones;
+
+    /** Archivo de conexiones en uso (null si no se ha cargado ninguno). */
+    private File archivoConexiones;
 
     /** Descripcion de los errores encontrados en la ultima carga. */
     private StringBuilder errores;
 
-    /** Cantidad de lineas con error en la ultima carga. */
+    /** Cantidad de lineas con error en la ultima carga (sumando los dos archivos). */
     private int cantidadErrores;
+
+    /** Cantidad de estaciones validas leidas en la ultima carga. */
+    private int estacionesLeidas;
 
     /** Cantidad de conexiones validas leidas en la ultima carga. */
     private int conexionesLeidas;
+
+    /** Nombre del archivo que se esta leyendo, para los mensajes de error. */
+    private String nombreArchivoLeido;
 
     /**
      * Crea el gestor sin ningun archivo asociado.
      */
     public GestorArchivo() {
-        archivoActual = null;
+        archivoEstaciones = null;
+        archivoConexiones = null;
         errores = new StringBuilder();
         cantidadErrores = 0;
+        estacionesLeidas = 0;
         conexionesLeidas = 0;
+        nombreArchivoLeido = "";
     }
 
+    // ===================================================================
+    // Carga
+    // ===================================================================
+
     /**
-     * Carga el archivo maestro de la red.
+     * Carga los dos archivos maestros de la red.
      *
      * @return el grafo construido
-     * @throws IOException si el archivo no existe, no se puede leer o no tiene conexiones validas
+     * @throws IOException si algun archivo no existe, no se puede leer o no tiene datos validos
      */
-    public Grafo cargarArchivoMaestro() throws IOException {
-        return cargar(new File(RUTA_ARCHIVO_MAESTRO));
+    public Grafo cargarArchivosMaestros() throws IOException {
+        return cargar(new File(RUTA_ESTACIONES_MAESTRO), new File(RUTA_CONEXIONES_MAESTRO));
     }
 
     /**
-     * Lee un archivo CSV y construye un grafo nuevo con su contenido.
-     * Cada estacion se crea la primera vez que aparece en el archivo.
+     * Lee los dos archivos y construye un grafo nuevo con su contenido.
      * Las lineas con errores se ignoran y se anotan (ver {@link #getErrores()}).
      * <p>
      * Se construye un grafo <b>nuevo</b>: si la carga falla, los datos que
      * ya estaban en memoria no se pierden.
      *
-     * @param archivo archivo a leer
+     * @param estaciones archivo de estaciones
+     * @param conexiones archivo de conexiones
      * @return el grafo construido
-     * @throws IOException si el archivo no existe, no se puede leer o no tiene conexiones validas
+     * @throws IOException si algun archivo no existe, no se puede leer,
+     *                     no tiene ninguna estacion valida o ambos son el mismo archivo
      */
-    public Grafo cargar(File archivo) throws IOException {
-        if (archivo == null || !archivo.isFile()) {
-            throw new IOException("El archivo no existe.");
+    public Grafo cargar(File estaciones, File conexiones) throws IOException {
+        if (estaciones == null || !estaciones.isFile()) {
+            throw new IOException("El archivo de estaciones no existe.");
+        }
+        if (conexiones == null || !conexiones.isFile()) {
+            throw new IOException("El archivo de conexiones no existe.");
+        }
+        if (estaciones.getAbsoluteFile().equals(conexiones.getAbsoluteFile())) {
+            throw new IOException("Seleccionó el mismo archivo dos veces.\n"
+                    + "Debe elegir un archivo de estaciones y otro de conexiones.");
         }
 
         Grafo nuevoGrafo = new Grafo();
         errores = new StringBuilder();
         cantidadErrores = 0;
+        estacionesLeidas = 0;
         conexionesLeidas = 0;
 
-        // try-with-resources: el archivo se cierra solo al terminar (como "with open" en Python).
-        // Se lee en UTF-8 para que nombres como "CAÑ" se lean bien.
-        try (BufferedReader lector = new BufferedReader(
-                new InputStreamReader(new FileInputStream(archivo), StandardCharsets.UTF_8))) {
+        // 1) Estaciones: crean los nodos del grafo y se guardan en la tabla hash
+        leerArchivo(estaciones, nuevoGrafo, true);
 
-            String linea = lector.readLine();
-            int numeroLinea = 1;
-            while (linea != null) {
-                procesarLinea(linea, numeroLinea, nuevoGrafo);
-                linea = lector.readLine();
-                numeroLinea++;
-            }
-        }
-
-        if (conexionesLeidas == 0) {
-            String mensaje = "El archivo no contiene ninguna conexion valida.\n"
-                    + "Formato esperado en cada linea: Estacion_Origen,Estacion_Destino,Tiempo_Minutos";
+        if (estacionesLeidas == 0) {
+            String mensaje = "El archivo " + estaciones.getName() + " no contiene ninguna estación válida.\n"
+                    + "Formato esperado en cada línea: " + ENCABEZADO_ESTACIONES;
             if (cantidadErrores > 0) {
                 mensaje += "\n\n" + getErrores();
             }
             throw new IOException(mensaje);
         }
 
-        archivoActual = archivo;
+        // 2) Conexiones: unen estaciones que ya existen
+        int erroresAntes = cantidadErrores;
+        leerArchivo(conexiones, nuevoGrafo, false);
+
+        // Si el archivo tenia lineas pero ninguna sirvio, probablemente no es un archivo de conexiones.
+        // (Un archivo de conexiones vacio si es valido: todas las estaciones quedan aisladas.)
+        if (conexionesLeidas == 0 && cantidadErrores > erroresAntes) {
+            throw new IOException("El archivo " + conexiones.getName() + " no contiene ninguna conexión válida.\n"
+                    + "Formato esperado en cada línea: " + ENCABEZADO_CONEXIONES + "\n\n" + getErrores());
+        }
+
+        archivoEstaciones = estaciones;
+        archivoConexiones = conexiones;
         return nuevoGrafo;
     }
 
     /**
-     * Valida una linea del archivo y, si es correcta, agrega la conexion al grafo.
+     * Lee un archivo linea por linea y manda cada linea a validar.
+     *
+     * @param archivo       archivo a leer
+     * @param grafo         grafo que se esta construyendo
+     * @param esEstaciones  true si es el archivo de estaciones, false si es el de conexiones
+     * @throws IOException si el archivo no se puede leer
+     */
+    private void leerArchivo(File archivo, Grafo grafo, boolean esEstaciones) throws IOException {
+        nombreArchivoLeido = archivo.getName();
+
+        // try-with-resources: el archivo se cierra solo al terminar (como "with open" en Python).
+        // Se lee en UTF-8 para que nombres como "CAÑ" o "Chacaíto" se lean bien.
+        try (BufferedReader lector = new BufferedReader(
+                new InputStreamReader(new FileInputStream(archivo), StandardCharsets.UTF_8))) {
+
+            String linea = lector.readLine();
+            int numeroLinea = 1;
+            while (linea != null) {
+                if (esEstaciones) {
+                    procesarLineaEstacion(linea, numeroLinea, grafo);
+                } else {
+                    procesarLineaConexion(linea, numeroLinea, grafo);
+                }
+                linea = lector.readLine();
+                numeroLinea++;
+            }
+        }
+    }
+
+    /**
+     * Valida una linea del archivo de estaciones y, si es correcta,
+     * crea la estacion y la agrega al grafo (y a la tabla hash).
      *
      * @param linea       texto de la linea
-     * @param numeroLinea numero de la linea (empieza en 1), para los mensajes de error
+     * @param numeroLinea numero de la linea (empieza en 1)
      * @param grafo       grafo que se esta construyendo
      */
-    private void procesarLinea(String linea, int numeroLinea, Grafo grafo) {
+    private void procesarLineaEstacion(String linea, int numeroLinea, Grafo grafo) {
         // Algunos programas (como Excel) agregan un caracter invisible al inicio del archivo
         linea = linea.replace("﻿", "").trim();
 
@@ -127,8 +196,62 @@ public class GestorArchivo {
         }
 
         String[] partes = linea.split(",");
+        if (partes.length != 5) {
+            agregarError(numeroLinea, "se esperaban 5 valores separados por coma (ID, nombre, línea, zona, capacidad)");
+            return;
+        }
+
+        String id = partes[0].trim();
+        String nombre = partes[1].trim();
+        String lineaTransporte = partes[2].trim();
+        String zona = partes[3].trim();
+        String textoCapacidad = partes[4].trim();
+
+        if (!esNumeroEntero(textoCapacidad)) {
+            if (numeroLinea == 1) {
+                return; // Es el encabezado (ej. "ID_Estacion,Nombre,Linea,Zona,Capacidad_Pasajeros_Hora")
+            }
+            agregarError(numeroLinea, "la capacidad \"" + textoCapacidad + "\" no es un número entero");
+            return;
+        }
+
+        int capacidad = Integer.parseInt(textoCapacidad);
+
+        if (id.isEmpty() || nombre.isEmpty() || lineaTransporte.isEmpty() || zona.isEmpty()) {
+            agregarError(numeroLinea, "falta algún dato de la estación");
+            return;
+        }
+        if (capacidad <= 0) {
+            agregarError(numeroLinea, "la capacidad debe ser mayor que cero");
+            return;
+        }
+
+        Estacion nueva = new Estacion(id, nombre, lineaTransporte, zona, capacidad);
+        if (grafo.agregarEstacion(nueva)) {
+            estacionesLeidas++;
+        } else {
+            agregarError(numeroLinea, "la estación " + id + " está repetida");
+        }
+    }
+
+    /**
+     * Valida una linea del archivo de conexiones y, si es correcta,
+     * conecta las dos estaciones en el grafo.
+     *
+     * @param linea       texto de la linea
+     * @param numeroLinea numero de la linea (empieza en 1)
+     * @param grafo       grafo que se esta construyendo
+     */
+    private void procesarLineaConexion(String linea, int numeroLinea, Grafo grafo) {
+        linea = linea.replace("﻿", "").trim();
+
+        if (linea.isEmpty()) {
+            return;
+        }
+
+        String[] partes = linea.split(",");
         if (partes.length != 3) {
-            agregarError(numeroLinea, "se esperaban 3 valores separados por coma");
+            agregarError(numeroLinea, "se esperaban 3 valores separados por coma (origen, destino, tiempo)");
             return;
         }
 
@@ -140,14 +263,14 @@ public class GestorArchivo {
             if (numeroLinea == 1) {
                 return; // Es el encabezado (ej. "Estacion_Origen,Estacion_Destino,Tiempo_Minutos")
             }
-            agregarError(numeroLinea, "el tiempo \"" + textoTiempo + "\" no es un numero entero");
+            agregarError(numeroLinea, "el tiempo \"" + textoTiempo + "\" no es un número entero");
             return;
         }
 
         int tiempo = Integer.parseInt(textoTiempo);
 
         if (idOrigen.isEmpty() || idDestino.isEmpty()) {
-            agregarError(numeroLinea, "falta el ID de alguna estacion");
+            agregarError(numeroLinea, "falta el ID de alguna estación");
             return;
         }
         if (tiempo <= 0) {
@@ -155,22 +278,24 @@ public class GestorArchivo {
             return;
         }
         if (idOrigen.equals(idDestino)) {
-            agregarError(numeroLinea, "una estacion no puede conectarse consigo misma");
+            agregarError(numeroLinea, "una estación no puede conectarse consigo misma");
             return;
         }
 
-        // Cada estacion se crea la primera vez que aparece
+        // La conexion solo puede unir estaciones que vienen en el archivo de estaciones
         if (!grafo.existeEstacion(idOrigen)) {
-            grafo.agregarEstacion(idOrigen);
+            agregarError(numeroLinea, "la estación " + idOrigen + " no está en el archivo de estaciones");
+            return;
         }
         if (!grafo.existeEstacion(idDestino)) {
-            grafo.agregarEstacion(idDestino);
+            agregarError(numeroLinea, "la estación " + idDestino + " no está en el archivo de estaciones");
+            return;
         }
 
         if (grafo.conectar(idOrigen, idDestino, tiempo)) {
             conexionesLeidas++;
         } else {
-            agregarError(numeroLinea, "la conexion " + idOrigen + "-" + idDestino + " esta repetida");
+            agregarError(numeroLinea, "la conexión " + idOrigen + "-" + idDestino + " está repetida");
         }
     }
 
@@ -190,7 +315,7 @@ public class GestorArchivo {
     }
 
     /**
-     * Anota un error de una linea del archivo.
+     * Anota un error de una linea del archivo que se esta leyendo.
      *
      * @param numeroLinea numero de la linea
      * @param descripcion que tiene de malo la linea
@@ -198,33 +323,86 @@ public class GestorArchivo {
     private void agregarError(int numeroLinea, String descripcion) {
         cantidadErrores++;
         if (cantidadErrores <= MAX_ERRORES_MOSTRADOS) {
-            errores.append("Linea ").append(numeroLinea).append(": ").append(descripcion).append("\n");
+            errores.append(nombreArchivoLeido).append(", línea ").append(numeroLinea)
+                    .append(": ").append(descripcion).append("\n");
+        }
+    }
+
+    // ===================================================================
+    // Guardado
+    // ===================================================================
+
+    /**
+     * Guarda la red en los mismos dos archivos que se cargaron.
+     *
+     * @param grafo red a guardar
+     * @throws IOException si todavia no hay archivos asociados o no se pueden escribir
+     */
+    public void guardar(Grafo grafo) throws IOException {
+        if (archivoEstaciones == null || archivoConexiones == null) {
+            throw new IOException("No hay archivos asociados. Primero cargue los archivos de la red.");
+        }
+        guardar(grafo, archivoEstaciones, archivoConexiones);
+    }
+
+    /**
+     * Guarda la red en dos archivos CSV con el mismo formato con el que se leen.
+     * Se guardan todas las estaciones, incluso las que no tienen conexiones.
+     *
+     * @param grafo      red a guardar
+     * @param estaciones archivo de estaciones (se sobrescribe)
+     * @param conexiones archivo de conexiones (se sobrescribe)
+     * @throws IOException si no se pueden escribir los archivos
+     */
+    public void guardar(Grafo grafo, File estaciones, File conexiones) throws IOException {
+        Estacion[] lista = grafo.obtenerEstaciones();
+        guardarEstaciones(lista, estaciones);
+        guardarConexiones(lista, conexiones);
+        archivoEstaciones = estaciones;
+        archivoConexiones = conexiones;
+    }
+
+    /**
+     * Escribe el archivo de estaciones: una linea por estacion.
+     *
+     * @param lista   estaciones de la red
+     * @param archivo archivo donde se escribe
+     * @throws IOException si no se puede escribir
+     */
+    private void guardarEstaciones(Estacion[] lista, File archivo) throws IOException {
+        try (BufferedWriter escritor = new BufferedWriter(
+                new OutputStreamWriter(new FileOutputStream(archivo), StandardCharsets.UTF_8))) {
+
+            escritor.write(ENCABEZADO_ESTACIONES);
+            escritor.newLine();
+
+            for (int i = 0; i < lista.length; i++) {
+                Estacion e = lista[i];
+                escritor.write(e.getId() + "," + e.getNombre() + "," + e.getLinea() + ","
+                        + e.getZona() + "," + e.getCapacidad());
+                escritor.newLine();
+            }
         }
     }
 
     /**
-     * Guarda la red en un archivo CSV con el mismo formato con el que se lee.
-     * Como el grafo es no dirigido, cada conexion esta guardada en las dos estaciones;
-     * para no escribirla dos veces, solo se escribe cuando el ID de origen va
-     * antes que el de destino en orden alfabetico.
-     * <p>
-     * Nota: una estacion que se quede sin conexiones no aparece en el archivo,
-     * porque el formato solo tiene lineas de conexiones.
+     * Escribe el archivo de conexiones. Como el grafo es no dirigido, cada conexion
+     * esta guardada en las dos estaciones; para no escribirla dos veces, solo se
+     * escribe cuando el ID de origen va antes que el de destino en orden alfabetico.
      *
-     * @param grafo   red a guardar
-     * @param archivo archivo donde se guarda (se sobrescribe)
-     * @throws IOException si no se puede escribir el archivo
+     * @param lista   estaciones de la red
+     * @param archivo archivo donde se escribe
+     * @throws IOException si no se puede escribir
      */
-    public void guardar(Grafo grafo, File archivo) throws IOException {
+    private void guardarConexiones(Estacion[] lista, File archivo) throws IOException {
         try (BufferedWriter escritor = new BufferedWriter(
                 new OutputStreamWriter(new FileOutputStream(archivo), StandardCharsets.UTF_8))) {
 
-            escritor.write(ENCABEZADO);
+            escritor.write(ENCABEZADO_CONEXIONES);
             escritor.newLine();
 
-            Estacion[] estaciones = grafo.obtenerEstaciones();
-            for (int i = 0; i < estaciones.length; i++) {
-                Estacion origen = estaciones[i];
+            for (int i = 0; i < lista.length; i++) {
+                Estacion origen = lista[i];
                 Conexion actual = origen.getPrimeraConexion();
 
                 while (actual != null) {
@@ -237,14 +415,24 @@ public class GestorArchivo {
                 }
             }
         }
-        archivoActual = archivo;
+    }
+
+    // ===================================================================
+    // Consultas
+    // ===================================================================
+
+    /**
+     * @return el archivo de estaciones en uso, o null si no se ha cargado ninguno
+     */
+    public File getArchivoEstaciones() {
+        return archivoEstaciones;
     }
 
     /**
-     * @return el archivo en uso, o null si no se ha cargado ninguno
+     * @return el archivo de conexiones en uso, o null si no se ha cargado ninguno
      */
-    public File getArchivoActual() {
-        return archivoActual;
+    public File getArchivoConexiones() {
+        return archivoConexiones;
     }
 
     /**
@@ -257,12 +445,12 @@ public class GestorArchivo {
     /**
      * Devuelve la descripcion de los errores de la ultima carga.
      *
-     * @return texto con un error por linea
+     * @return texto con un error por linea, indicando el archivo
      */
     public String getErrores() {
         String texto = errores.toString();
         if (cantidadErrores > MAX_ERRORES_MOSTRADOS) {
-            texto += "... y " + (cantidadErrores - MAX_ERRORES_MOSTRADOS) + " errores mas.\n";
+            texto += "... y " + (cantidadErrores - MAX_ERRORES_MOSTRADOS) + " errores más.\n";
         }
         return texto;
     }
@@ -272,6 +460,13 @@ public class GestorArchivo {
      */
     public int getCantidadErrores() {
         return cantidadErrores;
+    }
+
+    /**
+     * @return la cantidad de estaciones validas leidas en la ultima carga
+     */
+    public int getEstacionesLeidas() {
+        return estacionesLeidas;
     }
 
     /**
