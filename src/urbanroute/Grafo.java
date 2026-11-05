@@ -46,18 +46,21 @@ public class Grafo {
     }
 
     /**
-     * Agrega una estacion nueva (sin conexiones) a la red.
+     * Agrega una estacion nueva (todavia sin conexiones) a la red
+     * y la registra en la tabla hash con su ID como clave.
+     * Sus conexiones se agregan despues con {@link #conectar(String, String, int)}.
      *
-     * @param id ID de la nueva estacion
-     * @return la estacion creada, o null si el ID es invalido o ya existia
+     * @param nueva estacion a agregar
+     * @return true si se agrego, false si es null, su ID esta vacio o ya existia
      */
-    public Estacion agregarEstacion(String id) {
-        if (id == null || id.trim().isEmpty() || existeEstacion(id)) {
-            return null;
+    public boolean agregarEstacion(Estacion nueva) {
+        if (nueva == null || nueva.getId() == null || nueva.getId().trim().isEmpty()) {
+            return false;
         }
-        Estacion nueva = new Estacion(id.trim());
-        tablaEstaciones.insertar(nueva.getId(), nueva);
-        return nueva;
+        if (existeEstacion(nueva.getId())) {
+            return false;
+        }
+        return tablaEstaciones.insertar(nueva.getId(), nueva);
     }
 
     /**

@@ -6,7 +6,7 @@ Herramienta orientada al modelado, análisis y optimización de redes de transpo
 ## Integrantes del Equipo
 * Rafael Blanco - 32347798 
 * Francisco Landaeta - 32336964
-* Gabriel Gonzáles - 32122172
+* Gabriel González - 32122172
 
 ## Enlace del Repositorio
 * https://github.com/rafiuxon/UrbanRoute-ED

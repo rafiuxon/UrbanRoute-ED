@@ -4,15 +4,28 @@ package urbanroute;
  * Representa una parada o estacion de la red de transporte
  * (por ejemplo Propatria o Plaza Venezuela). Es un nodo del grafo.
  * <p>
- * Cada estacion guarda su lista de adyacencia: una lista enlazada
- * de objetos {@link Conexion} que salen de ella.
+ * Guarda los datos del archivo de estaciones (nombre, linea, zona y capacidad)
+ * y su lista de adyacencia: una lista enlazada de objetos {@link Conexion}
+ * que salen de ella.
  *
  * @author Gabriel Gonzalez, Francisco Landaeta, Rafael Blanco
  */
 public class Estacion {
 
-    /** Identificador de la estacion (ej. "PRO"). Funciona como su nombre. */
+    /** Identificador de la estacion (ej. "PRO"). Es la clave en la tabla hash. */
     private String id;
+
+    /** Nombre completo de la estacion (ej. "Propatria"). */
+    private String nombre;
+
+    /** Linea de transporte a la que pertenece (ej. "Linea 1"). */
+    private String linea;
+
+    /** Zona de la ciudad donde esta la estacion (ej. "Catia"). */
+    private String zona;
+
+    /** Capacidad de pasajeros por hora. */
+    private int capacidad;
 
     /** Primera conexion de la lista de adyacencia (null si no tiene). */
     private Conexion primeraConexion;
@@ -23,10 +36,18 @@ public class Estacion {
     /**
      * Crea una estacion sin conexiones.
      *
-     * @param id identificador de la estacion
+     * @param id        identificador de la estacion
+     * @param nombre    nombre completo
+     * @param linea     linea de transporte
+     * @param zona      zona de la ciudad
+     * @param capacidad capacidad de pasajeros por hora
      */
-    public Estacion(String id) {
+    public Estacion(String id, String nombre, String linea, String zona, int capacidad) {
         this.id = id;
+        this.nombre = nombre;
+        this.linea = linea;
+        this.zona = zona;
+        this.capacidad = capacidad;
         this.primeraConexion = null;
         this.grado = 0;
     }
@@ -36,6 +57,34 @@ public class Estacion {
      */
     public String getId() {
         return id;
+    }
+
+    /**
+     * @return el nombre completo de la estacion
+     */
+    public String getNombre() {
+        return nombre;
+    }
+
+    /**
+     * @return la linea de transporte de la estacion
+     */
+    public String getLinea() {
+        return linea;
+    }
+
+    /**
+     * @return la zona de la ciudad donde esta la estacion
+     */
+    public String getZona() {
+        return zona;
+    }
+
+    /**
+     * @return la capacidad de pasajeros por hora
+     */
+    public int getCapacidad() {
+        return capacidad;
     }
 
     /**
