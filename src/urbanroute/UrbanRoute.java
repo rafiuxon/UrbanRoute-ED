@@ -2,7 +2,8 @@ package urbanroute;
 
 /**
  * Clase principal del programa UrbanRoute.
- * Abre la ventana y carga el archivo maestro de la red.
+ * Abre la ventana y carga los dos archivos maestros de la red
+ * (estaciones y conexiones).
  *
  * @author Gabriel Gonzalez, Francisco Landaeta, Rafael Blanco
  */
@@ -18,7 +19,7 @@ public class UrbanRoute {
         java.awt.EventQueue.invokeLater(() -> {
             VentanaPrincipal ventana = new VentanaPrincipal();
             ventana.setVisible(true);
-            ventana.cargarArchivoMaestro();
+            ventana.cargarArchivosMaestros();
         });
     }
 }
