@@ -38,8 +38,8 @@ Referencias que usamos para diseñar las estructuras y los algoritmos. Todas las
 * Oracle. *Java SE 17 API*: [`String.hashCode()`](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/String.html#hashCode()) (misma fórmula con 31) y [`Hashtable`](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/Hashtable.html) (factor de carga 0,75 por defecto). Código fuente de OpenJDK de `Hashtable`: cada nodo guarda su valor hash.
 
 **Grafo y algoritmos (`Grafo`, `Pila`, `AnalizadorRed`)**
-* Cormen et al. (2009). Sec. 10.1: pilas. Sec. 22.1: lista de adyacencia. Sec. 22.3: búsqueda en profundidad (DFS). Sec. 24.3: algoritmo de Dijkstra.
-* Weiss, M. A. (2012). Cap. 9: representación de grafos, caminos más cortos con pesos (Dijkstra).
+* Cormen et al. (2009). Sec. 10.1: pilas. Sec. 22.1: lista de adyacencia. Sec. 22.3 y ejercicio 22.3-7: búsqueda en profundidad (DFS) usando una pila en vez de recursión. Sec. 24.3: algoritmo de Dijkstra (versión con arreglo, O(V²)). Apéndice B.4: grado de un vértice (hubs).
+* Weiss, M. A. (2012). Sec. 9.1: representación de grafos. Sec. 9.3: caminos más cortos con pesos (Dijkstra).
 
 **Dibujo de la red (`VisualizadorGrafo`)**
 * GraphStream 2.0 (gs-core y gs-ui-swing): https://graphstream-project.org/ . Se usa solo para dibujar; la red está guardada en nuestras propias clases.

@@ -34,8 +34,9 @@ package urbanroute;
  *   <li>Bloch, J. (2018). <i>Effective Java</i> (3.a ed.), item 11:
  *       por que se usa 31 como multiplicador.</li>
  *   <li>Oracle. Documentacion de Java SE 17: String.hashCode(), que usa la
- *       misma formula con 31, y java.util.Hashtable, que usa 0,75 como factor
- *       de carga por defecto. Se usaron solo como referencia: esta tabla no usa
+ *       misma formula con 31 (la diferencia es que Java deja que el numero se
+ *       desborde y aqui se aplica el modulo 2^31 - 1 en cada paso), y
+ *       java.util.Hashtable, que usa 0,75 como factor de carga por defecto. Se usaron solo como referencia: esta tabla no usa
  *       ninguna clase de Java Collections.</li>
  * </ul>
  *
@@ -49,7 +50,10 @@ public class TablaHash {
     /** Si cantidad / capacidad supera este valor, la tabla se agranda. */
     private static final double FACTOR_CARGA_MAXIMO = 0.75;
 
-    /** Multiplicador de la funcion hash: un primo mayor que la diferencia entre dos letras (25). */
+    /**
+     * Multiplicador de la funcion hash. Se usa 31 porque es un numero primo e
+     * impar, como explica Bloch (item 11); es el mismo que usa String.hashCode().
+     */
     private static final int MULTIPLICADOR = 31;
 
     /**

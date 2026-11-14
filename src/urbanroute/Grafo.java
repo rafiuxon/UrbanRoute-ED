@@ -9,6 +9,11 @@ package urbanroute;
  * </ul>
  * Para encontrar una estacion por su ID, el grafo delega la busqueda
  * a la {@link TablaHash}, asi no tiene que recorrer todas las estaciones.
+ * <p>
+ * <b>Fuentes:</b> Cormen, T. H. et al. (2009). <i>Introduction to Algorithms</i>
+ * (3.a ed.), seccion 22.1 "Representations of graphs" (lista de adyacencia), y
+ * Weiss, M. A. (2012). <i>Data Structures and Algorithm Analysis in Java</i>
+ * (3.a ed.), seccion 9.1 (representacion de grafos).
  *
  * @author Gabriel Gonzalez, Francisco Landaeta, Rafael Blanco
  */

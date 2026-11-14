@@ -10,6 +10,21 @@ package urbanroute;
  * Los algoritmos no guardan resultados entre llamadas: cada vez se calculan
  * sobre la red como esta en ese momento, asi que despues de cerrar una
  * estacion o una conexion el resultado ya refleja el cambio.
+ * <p>
+ * <b>Fuentes:</b>
+ * <ul>
+ *   <li>Cormen, T. H., Leiserson, C. E., Rivest, R. L. y Stein, C. (2009).
+ *       <i>Introduction to Algorithms</i> (3.a ed.), seccion 22.3 "Depth-first
+ *       search" y ejercicio 22.3-7 (hacer el DFS con una pila en vez de
+ *       recursion).</li>
+ *   <li>Cormen et al. (2009), seccion 24.3 "Dijkstra's algorithm". La estacion
+ *       con menor tiempo se busca recorriendo un arreglo, que es la version
+ *       O(V^2) que el libro explica en el analisis del algoritmo.</li>
+ *   <li>Cormen et al. (2009), apendice B.4 "Graphs": definicion de grado
+ *       (cantidad de conexiones de un vertice), usada para los hubs.</li>
+ *   <li>Weiss, M. A. (2012). <i>Data Structures and Algorithm Analysis in Java</i>
+ *       (3.a ed.), seccion 9.3 "Shortest-Path Algorithms" (Dijkstra).</li>
+ * </ul>
  *
  * @author Gabriel Gonzalez, Francisco Landaeta, Rafael Blanco
  */
