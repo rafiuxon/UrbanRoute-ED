@@ -5,6 +5,7 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
+import java.awt.GridBagLayout;
 import java.awt.GridLayout;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
@@ -90,7 +91,7 @@ public class VentanaPrincipal extends JFrame {
         grafo = new Grafo();
         gestorArchivo = new GestorArchivo();
         analizador = new AnalizadorRed(grafo);
-        visualizador = new VisualizadorGrafo();
+        visualizador = new VisualizadorGrafo(analizador);
         hayCambiosSinGuardar = false;
         estacionesTabla = new Estacion[0];
 
@@ -131,23 +132,37 @@ public class VentanaPrincipal extends JFrame {
     }
 
     /**
-     * @return panel con el titulo y las instrucciones de uso
+     * @return panel con el titulo, las instrucciones de uso y el boton Salir
      */
     private JPanel crearPanelSuperior() {
-        JPanel panel = new JPanel(new GridLayout(2, 1));
-        panel.setBackground(COLOR_PRINCIPAL);
-        panel.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
-
         JLabel titulo = new JLabel("UrbanRoute");
         titulo.setFont(new Font("SansSerif", Font.BOLD, 22));
         titulo.setForeground(Color.WHITE);
 
         JLabel instrucciones = new JLabel("La red se carga desde dos archivos .csv: uno de estaciones y otro de "
-                + "conexiones. Use los botones de la izquierda para modificarla y guardarla.");
+                + "conexiones. Use los botones de la izquierda para modificarla, analizarla y verla dibujada.");
         instrucciones.setForeground(Color.WHITE);
 
-        panel.add(titulo);
-        panel.add(instrucciones);
+        JPanel textos = new JPanel(new GridLayout(2, 1));
+        textos.setOpaque(false); // deja ver el fondo azul
+        textos.add(titulo);
+        textos.add(instrucciones);
+
+        // Salir: pregunta si se quieren guardar los cambios antes de cerrar
+        JButton botonSalir = crearBoton("Salir", "Cerrar el programa (pregunta si hay cambios sin guardar)");
+        botonSalir.setPreferredSize(new Dimension(100, 32));
+        botonSalir.addActionListener(e -> salir());
+
+        // GridBagLayout con un solo componente lo deja centrado y sin estirarlo
+        JPanel zonaBoton = new JPanel(new GridBagLayout());
+        zonaBoton.setOpaque(false);
+        zonaBoton.add(botonSalir);
+
+        JPanel panel = new JPanel(new BorderLayout(15, 0));
+        panel.setBackground(COLOR_PRINCIPAL);
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
+        panel.add(textos, BorderLayout.CENTER);
+        panel.add(zonaBoton, BorderLayout.EAST);
         return panel;
     }
 
@@ -163,10 +178,11 @@ public class VentanaPrincipal extends JFrame {
         JButton botonAgregarCon = crearBoton("Agregar conexión", "Conectar dos estaciones que ya existen");
         JButton botonEliminarEst = crearBoton("Eliminar estación", "Simular el cierre de una estación");
         JButton botonEliminarCon = crearBoton("Eliminar conexión", "Quitar el tramo entre dos estaciones");
-        JButton botonVer = crearBoton("Ver grafo", "Dibujo de la red");
+        JButton botonVer = crearBoton("Ver grafo", "Dibujo de la red en una ventana aparte");
         JButton botonSubredes = crearBoton("Subredes aisladas", "Zonas que quedan incomunicadas (DFS)");
         JButton botonRuta = crearBoton("Ruta más rápida", "Ruta de menor tiempo (Dijkstra)");
         JButton botonHubs = crearBoton("Hubs", "Estaciones con más conexiones");
+        JButton botonHash = crearBoton("Ver tabla hash", "Casillas, colisiones y factor de carga de la tabla hash");
 
         botonCargar.addActionListener(e -> cargarArchivos());
         botonGuardar.addActionListener(e -> guardarCambios());
@@ -174,10 +190,11 @@ public class VentanaPrincipal extends JFrame {
         botonAgregarCon.addActionListener(e -> agregarConexion());
         botonEliminarEst.addActionListener(e -> eliminarEstacion());
         botonEliminarCon.addActionListener(e -> eliminarConexion());
-        botonVer.addActionListener(e -> funcionPendiente("Ver grafo"));
+        botonVer.addActionListener(e -> verGrafo());
         botonSubredes.addActionListener(e -> mostrarSubredes());
         botonRuta.addActionListener(e -> calcularRuta());
         botonHubs.addActionListener(e -> mostrarHubs());
+        botonHash.addActionListener(e -> mostrarTablaHash());
 
         botones.add(crearTituloGrupo("Archivos"));
         botones.add(botonCargar);
@@ -192,6 +209,7 @@ public class VentanaPrincipal extends JFrame {
         botones.add(botonSubredes);
         botones.add(botonRuta);
         botones.add(botonHubs);
+        botones.add(botonHash);
 
         // Se pone dentro de otro panel para que los botones no se estiren hasta abajo
         JPanel contenedor = new JPanel(new BorderLayout());
@@ -899,7 +917,10 @@ public class VentanaPrincipal extends JFrame {
             texto += "\n\n";
         }
 
-        mostrarTextoLargo(texto, "Subredes aisladas", JOptionPane.INFORMATION_MESSAGE);
+        if (preguntarVerEnGrafo(texto, "Subredes aisladas")) {
+            visualizador.colorearSubredes(subredes);
+            visualizador.abrir();
+        }
     }
 
     /**
@@ -962,7 +983,10 @@ public class VentanaPrincipal extends JFrame {
             texto += "\nTiempo total: " + analizador.getTiempoUltimaRuta() + " minutos"
                     + "  (" + (ruta.length - 1) + " tramos)";
 
-            mostrarTextoLargo(texto, "Ruta más rápida", JOptionPane.INFORMATION_MESSAGE);
+            if (preguntarVerEnGrafo(texto, "Ruta más rápida")) {
+                visualizador.resaltarRuta(ruta, analizador.getTiempoUltimaRuta());
+                visualizador.abrir();
+            }
             return;
         }
     }
@@ -995,7 +1019,87 @@ public class VentanaPrincipal extends JFrame {
                     + ": " + ranking[i].getGrado() + " conexión(es)\n";
         }
 
-        mostrarTextoLargo(texto, "Hubs", JOptionPane.INFORMATION_MESSAGE);
+        if (preguntarVerEnGrafo(texto, "Hubs")) {
+            visualizador.resaltarHubs(hubs);
+            visualizador.abrir();
+        }
+    }
+
+    // ===================================================================
+    // Ver tabla hash
+    // ===================================================================
+
+    /**
+     * Muestra como esta la tabla hash por dentro: su tamano, el factor de
+     * carga, las colisiones y, por cada casilla ocupada, la cadena de
+     * estaciones con el valor hash de cada una.
+     */
+    private void mostrarTablaHash() {
+        TablaHash tabla = grafo.getTablaEstaciones();
+        if (tabla.getCantidad() == 0) {
+            mostrarError("La red no tiene estaciones, así que la tabla hash está vacía.");
+            return;
+        }
+
+        int capacidad = tabla.getCapacidad();
+        int ocupadas = tabla.contarCasillasOcupadas();
+
+        // ---- Resumen ----
+        JTextArea resumen = new JTextArea(
+                "Capacidad: " + capacidad + " casillas (número primo)\n"
+                + "Estaciones guardadas: " + tabla.getCantidad() + "\n"
+                + "Factor de carga: " + String.format("%.2f", tabla.getFactorCarga())
+                + " (la tabla crece al pasar de 0,75)\n"
+                + "Casillas ocupadas: " + ocupadas + " de " + capacidad + "\n"
+                + "Colisiones: " + tabla.contarColisiones() + " estación(es) cayeron en una casilla ocupada\n"
+                + "Cadena más larga: " + tabla.getLargoCadenaMasLarga() + " estación(es)\n\n"
+                + "Posición de cada estación = valor hash % " + capacidad + ". "
+                + "Las casillas con más de una estación son colisiones, resueltas con encadenamiento.");
+        resumen.setEditable(false);
+        resumen.setLineWrap(true);
+        resumen.setWrapStyleWord(true);
+        resumen.setOpaque(false);
+
+        // ---- Una fila por casilla ocupada ----
+        Object[][] filas = new Object[ocupadas][3];
+        int fila = 0;
+        for (int i = 0; i < capacidad; i++) {
+            NodoHash actual = tabla.getPrimeroDeCasilla(i);
+            if (actual == null) {
+                continue;
+            }
+            String cadena = "";
+            int largo = 0;
+            while (actual != null) {
+                if (largo > 0) {
+                    cadena += "  →  ";
+                }
+                cadena += actual.getClave() + " (" + actual.getValorHash() + ")";
+                largo++;
+                actual = actual.getSiguiente();
+            }
+            filas[fila][0] = i;
+            filas[fila][1] = cadena;
+            filas[fila][2] = largo;
+            fila++;
+        }
+
+        String[] columnas = {"Casilla", "Estaciones en la cadena (valor hash)", "Largo"};
+        JTable vista = new JTable(filas, columnas);
+        vista.setDefaultEditor(Object.class, null); // solo para ver, no se puede editar
+        vista.setRowHeight(22);
+        vista.getTableHeader().setReorderingAllowed(false);
+        vista.getColumnModel().getColumn(0).setPreferredWidth(60);
+        vista.getColumnModel().getColumn(1).setPreferredWidth(460);
+        vista.getColumnModel().getColumn(2).setPreferredWidth(50);
+
+        JScrollPane scroll = new JScrollPane(vista);
+        scroll.setPreferredSize(new Dimension(600, 280));
+
+        JPanel panel = new JPanel(new BorderLayout(0, 10));
+        panel.add(resumen, BorderLayout.NORTH);
+        panel.add(scroll, BorderLayout.CENTER);
+        JOptionPane.showMessageDialog(this, panel, "Tabla hash de estaciones", JOptionPane.PLAIN_MESSAGE);
     }
 
     // ===================================================================
@@ -1035,22 +1139,44 @@ public class VentanaPrincipal extends JFrame {
     // ===================================================================
 
     /**
-     * Avisa que una funcion todavia no esta disponible.
-     *
-     * @param nombre nombre de la funcion
+     * Abre la ventana con el dibujo de la red.
      */
-    private void funcionPendiente(String nombre) {
-        JOptionPane.showMessageDialog(this,
-                "La función \"" + nombre + "\" estará disponible en una próxima versión.",
-                "En construcción", JOptionPane.INFORMATION_MESSAGE);
+    private void verGrafo() {
+        if (grafo.estaVacio()) {
+            mostrarError("No hay estaciones cargadas para dibujar.");
+            return;
+        }
+        visualizador.abrir();
     }
 
     /**
-     * Actualiza la tabla con la red en memoria y la barra de estado.
+     * Muestra el resultado de un analisis y pregunta si se quiere ver en el dibujo.
+     *
+     * @param texto  resultado a mostrar
+     * @param titulo titulo de la ventana
+     * @return true si el usuario eligio "Ver en el grafo"
+     */
+    private boolean preguntarVerEnGrafo(String texto, String titulo) {
+        JTextArea area = new JTextArea(texto);
+        area.setEditable(false);
+        area.setLineWrap(true);
+        area.setWrapStyleWord(true);
+        JScrollPane scroll = new JScrollPane(area);
+        scroll.setPreferredSize(new Dimension(520, 240));
+
+        String[] opciones = {"Ver en el grafo", "Cerrar"};
+        int eleccion = JOptionPane.showOptionDialog(this, scroll, titulo, JOptionPane.DEFAULT_OPTION,
+                JOptionPane.INFORMATION_MESSAGE, null, opciones, opciones[0]);
+        return eleccion == 0;
+    }
+
+    /**
+     * Actualiza la tabla, el dibujo de la red y la barra de estado con la red en memoria.
      */
     private void mostrarRed() {
         estacionesTabla = grafo.obtenerEstaciones();
         modeloTabla.fireTableDataChanged(); // le avisa a la tabla que los datos cambiaron
+        visualizador.actualizar(grafo);     // el dibujo tambien refleja el cambio
         actualizarEstado();
     }
 

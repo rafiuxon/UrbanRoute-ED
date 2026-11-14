@@ -182,4 +182,14 @@ public class Grafo {
     public boolean estaVacio() {
         return tablaEstaciones.getCantidad() == 0;
     }
+
+    /**
+     * Da acceso a la tabla hash de estaciones para mostrar como esta por
+     * dentro (casillas, colisiones y factor de carga).
+     *
+     * @return la tabla hash que indexa las estaciones de la red
+     */
+    public TablaHash getTablaEstaciones() {
+        return tablaEstaciones;
+    }
 }
