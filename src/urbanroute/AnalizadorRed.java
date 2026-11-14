@@ -58,7 +58,8 @@ public class AnalizadorRed {
      * <p>
      * Eficiencia: O(V + E), porque cada estacion se visita una vez y cada
      * conexion se revisa una vez desde cada extremo. Las visitadas se guardan
-     * en una {@link TablaHash}, asi preguntar "¿ya la visite?" cuesta O(1).
+     * en una {@link TablaHash}, asi preguntar "¿ya la visite?" cuesta O(1),
+     * y los pendientes por visitar en una {@link Pila}.
      *
      * @return arreglo de subredes, de la mas grande a la mas pequena;
      *         cada subred es un arreglo de estaciones
@@ -71,8 +72,9 @@ public class AnalizadorRed {
         Estacion[][] subredes = new Estacion[estaciones.length][];
         int cantidadSubredes = 0;
 
-        // Arreglos de trabajo: la pila del DFS y la subred que se esta armando
-        Estacion[] pila = new Estacion[estaciones.length];
+        // Estructuras de trabajo: la pila del DFS y la subred que se esta armando.
+        // La misma pila sirve para todas las subredes, porque cada DFS la deja vacia.
+        Pila pila = new Pila(estaciones.length);
         Estacion[] temporal = new Estacion[estaciones.length];
 
         for (int i = 0; i < estaciones.length; i++) {
@@ -101,45 +103,41 @@ public class AnalizadorRed {
     }
 
     /**
-     * Recorrido DFS desde una estacion, usando una <b>pila</b> propia
+     * Recorrido DFS desde una estacion, usando la clase {@link Pila}
      * (el ultimo en entrar es el primero en salir). Como siempre se sigue
-     * por la ultima estacion que se agrego, el recorrido va "lo mas profundo
+     * por la ultima estacion que se apilo, el recorrido va "lo mas profundo
      * posible" antes de volver, que es la idea del DFS.
      * <p>
      * Se usa una pila en vez de recursion para que una red muy grande no
      * desborde la memoria de llamadas de Java (StackOverflowError).
-     * Cada estacion se marca como visitada al meterla en la pila, asi
-     * nunca entra dos veces y la pila no necesita mas de V posiciones.
+     * Cada estacion se marca como visitada al apilarla, asi nunca entra
+     * dos veces y la pila no necesita mas de V posiciones.
      *
      * @param inicio    estacion desde donde empieza el recorrido
      * @param visitadas tabla con las estaciones ya visitadas
-     * @param pila      arreglo que se usa como pila
+     * @param pila      pila vacia que se usa durante el recorrido (al terminar queda vacia otra vez)
      * @param subred    arreglo donde se van guardando las estaciones de la subred
      * @return la cantidad de estaciones de la subred
      */
-    private int recorrerDFS(Estacion inicio, TablaHash visitadas, Estacion[] pila, Estacion[] subred) {
-        int tope = 0;      // cuantos elementos hay en la pila
-        int cantidad = 0;  // cuantas estaciones lleva la subred
+    private int recorrerDFS(Estacion inicio, TablaHash visitadas, Pila pila, Estacion[] subred) {
+        int cantidad = 0; // cuantas estaciones lleva la subred
 
-        pila[tope] = inicio;
-        tope++;
+        pila.apilar(inicio);
         visitadas.insertar(inicio.getId(), inicio);
 
-        while (tope > 0) {
+        while (!pila.estaVacia()) {
             // Sacar de la pila la ultima estacion que entro
-            tope--;
-            Estacion actual = pila[tope];
+            Estacion actual = pila.desapilar();
             subred[cantidad] = actual;
             cantidad++;
 
-            // Meter en la pila a las vecinas que todavia no fueron visitadas
+            // Apilar a las vecinas que todavia no fueron visitadas
             Conexion conexion = actual.getPrimeraConexion();
             while (conexion != null) {
                 Estacion vecina = conexion.getDestino();
                 if (visitadas.buscar(vecina.getId()) == null) {
                     visitadas.insertar(vecina.getId(), vecina);
-                    pila[tope] = vecina;
-                    tope++;
+                    pila.apilar(vecina);
                 }
                 conexion = conexion.getSiguiente();
             }
